@@ -53,7 +53,11 @@ class DocBuilder:
 
     def add_text(self, text: str):
         p = self.doc.add_paragraph()
-        _set_fonts(p.add_run(text), 11)
+        for i, part in enumerate(text.split("\n")):
+            run = p.add_run(part)
+            _set_fonts(run, 11)
+            if i < text.count("\n"):
+                run.add_break()
 
     def add_equation(self, latex: str):
         p = self.doc.add_paragraph()
