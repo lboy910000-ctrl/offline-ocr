@@ -1,0 +1,13 @@
+numpy
+opencv-python-headless
+pytesseract
+Pillow
+python-docx
+latex2mathml
+mathml2omml
+pyinstaller
+# --- Math (equation) engine. Remove this line for a small "lite" build ---
+albumentations==1.3.1
+pix2tex
+# Also install CPU PyTorch first:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
