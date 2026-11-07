@@ -5,8 +5,8 @@ from PyInstaller.utils.hooks import collect_all
 datas = [("vendor/tesseract", "tesseract")]
 binaries, hiddenimports = [], []
 
-for pkg in ("pix2tex", "x_transformers", "timm", "latex2mathml", "mathml2omml",
-            "albumentations", "pytesseract"):
+for pkg in ("torchvision", "pix2tex", "x_transformers", "timm", "latex2mathml",
+            "mathml2omml", "albumentations", "pytesseract"):
     if importlib.util.find_spec(pkg):
         d, b, h = collect_all(pkg)
         datas += d; binaries += b; hiddenimports += h

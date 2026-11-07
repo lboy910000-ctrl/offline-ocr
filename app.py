@@ -2,6 +2,7 @@
 import multiprocessing
 import os
 import queue
+import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -200,4 +201,7 @@ class App(tk.Tk):
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
+    if "--selftest" in sys.argv:
+        from selftest import run
+        run()
     App().mainloop()
