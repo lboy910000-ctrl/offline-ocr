@@ -132,25 +132,35 @@ def _merge_overlapping(boxes):
 # --------------------------------------------------------------------------
 # Graph / figure detection
 # --------------------------------------------------------------------------
-def detect_figures(gray: np.ndarray, word_boxes, table_cover: float):
+def detect_figures(bgr: np.ndarray, gray: np.ndarray, word_boxes, table_cover: float):
     """Find chart/graph/diagram regions: big structural ink (axes, bars,
-    curves, wedges, borders) that is NOT text. Text labels near the structure
-    (axis labels, legends, titles) are pulled into the region."""
+    curves, wedges) that is NOT text. Text labels near the structure
+    (axis labels, legends, titles) are pulled into the region.
+
+    Ignored on purpose: pale watermarks, page-wide header/footer bars, column
+    dividers/borders, and any region that is mostly text (a page of text)."""
     H, W = gray.shape
     dim = max(H, W)
     bw = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                cv2.THRESH_BINARY_INV, 35, 12)
-    mask = bw.copy()
+    # only dark or colourful ink counts -> pale grey watermarks are ignored
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+    strong = ((gray < 140) | (hsv[:, :, 1] > 70)).astype(np.uint8) * 255
+    mask = cv2.bitwise_and(bw, strong)
     for x, y, w, h in word_boxes:
         cv2.rectangle(mask, (x, y), (x + w, y + h), 0, -1)
 
     n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
     big = np.zeros_like(mask)
-    min_side = 0.06 * dim
+    min_side = 0.07 * dim
     for i in range(1, n):
         x, y, w, h, area = stats[i]
-        if max(w, h) >= min_side and area >= 12:
-            big[labels == i] = 255
+        if max(w, h) < min_side or area < 12:
+            continue
+        # skip page-wide bars / dividers / borders (long and thin)
+        if min(w, h) <= 0.08 * dim and (w >= 0.6 * W or h >= 0.6 * H):
+            continue
+        big[labels == i] = 255
     if not big.any():
         return []
 
@@ -173,11 +183,14 @@ def detect_figures(gray: np.ndarray, word_boxes, table_cover: float):
 
     figures = []
     for (x, y, w, h) in regions:
-        if w < 0.08 * W or h < 0.06 * H or w * h < 0.012 * W * H:
+        if w < 0.08 * W or h < 0.06 * H or w * h < 0.02 * W * H:
             continue
-        cover = sum(ww * hh for (wx, wy, ww, hh) in word_boxes
-                    if _inside(wx + ww / 2, wy + hh / 2, (x, y, w, h))) / float(w * h)
-        if cover > table_cover:      # text-heavy: a table or paragraph frame
+        if w * h > 0.6 * W * H:      # that is the whole page, not a graph
+            continue
+        inside = [(wx, wy, ww, hh) for (wx, wy, ww, hh) in word_boxes
+                  if _inside(wx + ww / 2, wy + hh / 2, (x, y, w, h))]
+        cover = sum(ww * hh for (_, _, ww, hh) in inside) / float(w * h)
+        if cover > table_cover or len(inside) > 40:   # text-heavy: table / paragraphs
             continue
         pad = 10
         x0, y0 = max(0, x - pad), max(0, y - pad)
@@ -313,7 +326,7 @@ def process_image(path: str, index: int, opts: Options, graph_dir: str,
     # ---- graphs / figures
     figs = []
     if opts.graphs:
-        figs = detect_figures(gray, words, opts.table_cover)
+        figs = detect_figures(img, gray, words, opts.table_cover)
         for n, (x, y, w, h) in enumerate(figs, 1):
             out = os.path.join(graph_dir, f"{index:03d}_{stem}_graph{n}.png")
             save_png(out, img[y:y + h, x:x + w])
